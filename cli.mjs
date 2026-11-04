@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { spawn } from 'node:child_process';
-import { runStudioCommand } from './src/agent-tools.mjs';
+import { agentTools, runStudioCommand } from './src/agent-tools.mjs';
 import { isMainModule } from './src/main-module.mjs';
 import { inspectFfmpeg } from './src/ffmpeg.mjs';
 import { DATA_ROOT, PROJECT_ROOT, StudioError, ensureDataRoot, safeResolveWithin } from './src/paths.mjs';
@@ -212,7 +212,8 @@ function print(value, jsonMode) {
 }
 
 function help() {
-  console.log('Agent/editor interface: node cli.mjs studio schema|list|get|timeline|frame|storyboard|review|highlights|beats|create|analyze|plan|edit|update|silence|history|diff|restore|style|captions_import|doctor|duplicate|auto_edit|transcribe|transcript|text_edit|reframe|publish_pack|brand|find_clips|qc|wait|queue|recipe|freeze|render_range|fit_duration|sections|search|assemble|sync|multicam|export_timeline|comments|proxies|lut|color_match|stabilize|music_fit|audio_repair|sfx|auto_zoom|auto_broll|batch|compare|render [--project ID] [--revision N] [--request file.json|-] [--wait]\nMCP stdio: node mcp.mjs\nSpeech engine (optional, local): node cli.mjs speech-setup [--model base|small|large-v3-turbo-q5_0]\nInstall for every agent on this computer: node cli.mjs install [--data-root <folder>] [--no-claude] [--no-codex] [--no-desktop] [--no-cursor] [--dry-run] [--json] | node cli.mjs uninstall\nOpenAI Codex only: node cli.mjs codex-setup [--data-root <folder>] [--plugin] [--uninstall] [--dry-run]\nSee AGENTS.md for workflows and examples.\n');
+  const studioCommands = agentTools.map(tool => tool.name.replace(/^studio_/, '')).join('|');
+  console.log(`Agent/editor interface: node cli.mjs studio ${studioCommands} [--project ID] [--revision N] [--request file.json|-] [--wait]\nMCP stdio: node mcp.mjs\nSpeech engine (optional, local): node cli.mjs speech-setup [--model base|small|large-v3-turbo-q5_0]\nInstall for every agent on this computer: node cli.mjs install [--data-root <folder>] [--no-claude] [--no-codex] [--no-desktop] [--no-cursor] [--dry-run] [--json] | node cli.mjs uninstall\nOpenAI Codex only: node cli.mjs codex-setup [--data-root <folder>] [--plugin] [--uninstall] [--dry-run]\nSee AGENTS.md for workflows and examples.`);
   console.log(`AI Edit Studio\n\nUsage:\n  node cli.mjs doctor [--json]\n  node cli.mjs serve\n  node cli.mjs mcp   (MCP server over stdio, for agents)\n  node cli.mjs processes [query] [--json]\n  node cli.mjs capture start --process bf6.exe --project BF6 --fps 120\n  node cli.mjs capture stop\n  node cli.mjs capture status\n  node cli.mjs run --input <file|folder> [--output D:\\...\\trailer.mp4]\n  node cli.mjs from-last-capture [same trailer options]\n  node cli.mjs jobs [--json]\n  node cli.mjs job <id> [--json]\n\nTrailer options:\n  --duration 60 --style action|cinematic|gameplay|showcase|air-combat\n  --title "My trailer" --music D:\\Music\\track.wav\n  --resolution 2560x1440 --fps 60 --no-preview --preview-only\n`);
 }
 
