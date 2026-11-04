@@ -8,7 +8,7 @@ import { DATA_ROOT, PROJECT_ROOT, StudioError } from './paths.mjs';
 import { findFfmpegTools, inspectFfmpeg } from './ffmpeg.mjs';
 import { runProcess } from './process.mjs';
 import { normalizeWords, wordsFromSegments } from '../public/transcript.js';
-import { parseSrt } from '../public/captions.js';
+import { parseSrtCues } from '../public/captions.js';
 
 const exe = name => `${name}${process.platform === 'win32' ? '.exe' : ''}`;
 export const WHISPER_ROOT = path.join(DATA_ROOT, 'tools', 'whisper');
@@ -134,7 +134,7 @@ export async function transcribeFile(file, { language = 'auto', model: wanted, w
   await runProcess(tools.ffmpeg, ['-hide_banner', '-nostdin', '-v', 'error', '-protocol_whitelist', 'file,pipe', '-i', file, '-vn',
     '-af', `aresample=16000,whisper=model='${filterPath(model.file)}':language=${language}:queue=10:destination='${filterPath(srt)}':format=srt`, '-f', 'null', '-'],
   { timeoutMs: 4 * 60 * 60_000 });
-  const cues = parseSrt(await fsp.readFile(srt, 'utf8'), 0);
+  const cues = parseSrtCues(await fsp.readFile(srt, 'utf8'), 0);
   const segments = cues.map(c => ({ start: c.start, end: c.end, text: c.text }));
   return { engine: 'ffmpeg-whisper', model: model.name, language, words: wordsFromSegments(segments), segments, wordTiming: 'estimated' };
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { normalizeOptions, validateClips, proposeEdit, validateCaptionSources } from '../src/editing.mjs';
 import { normalizeFinish, normalizeTransform, gradeFilter } from '../src/finishing.mjs';
 import { EditHistory, splitClip, availableClip } from '../public/edit-history.js';
-import { parseSrt, mapCaptions, normalizeCaptions, toSrt } from '../public/captions.js';
+import { parseSrt, parseSrtCues, parseVttCues, mapCaptions, normalizeCaptions, toSrt } from '../public/captions.js';
 import { callAgentTool, agentTools } from '../src/agent-tools.mjs';
 import { buildFilter, renderTrailer } from '../src/render.mjs';
 import { proposeSilenceCuts } from '../src/silence.mjs';
@@ -74,6 +74,19 @@ test('SRT captions follow source trims, reorder, speed and timing correction', (
   assert.equal(mapCaptions(cues, [clip], 1)[0].start, 3);
   assert.throws(() => parseSrt('1\nnot a time\nHello')); assert.throws(() => normalizeCaptions([{ sourceIndex: 0, start: 5, end: 2, text: 'bad' }]));
   assert.throws(() => validateCaptionSources(cues, [{ duration: 3 }]));
+});
+test('transcript cues drop the caption limits; VTT reads header, settings, ids and short times', () => {
+  const long = Array.from({ length: 400 }, (_, i) => `${i + 1}\n00:00:${String(i % 60).padStart(2, '0')},${String((i * 7) % 1000).padStart(3, '0')} --> 00:00:${String((i + 1) % 60).padStart(2, '0')},000\ncue ${i + 1}`).join('\n\n');
+  assert.equal(parseSrtCues(long).length, 400);
+  assert.throws(() => parseSrt(long), /At most 300 caption lines|too large/);
+  assert.ok(parseSrtCues(`1\n00:00:01,000 --> 00:00:02,000\n${'word '.repeat(40)}`)[0].text.length > 180);
+  // A talk has more than 300 cues, so the transcript import path must not go through parseSrt.
+  const youtube = ['WEBVTT', 'Kind: captions', 'Language: en', '', 'intro', '00:00:04.000 --> 00:00:06.000 align:start position:0%', 'Hello there', '', 'NOTE this block is a comment', '', 'STYLE\n::cue { color: red }', '', '00:01.000 --> 00:04.000', 'Short times on both sides', '', '00:00:10.000 --> 01:02:03.456', 'Full form end'].join('\n');
+  const cues = parseVttCues(youtube, 2);
+  assert.deepEqual(cues.map(c => [c.sourceIndex, c.start, c.end]), [
+    [2, 4, 6], [2, 1, 4], [2, 10, 1 * 3600 + 2 * 60 + 3.456],
+  ]);
+  assert.deepEqual(cues.map(c => c.text), ['Hello there', 'Short times on both sides', 'Full form end']);
 });
 test('silence proposal is non-mutating, preserves padding and protected final shot', () => {
   const s = { ...source, audio: Array.from({ length: 20 }, (_, i) => ({ time: i / 2, value: i >= 6 && i < 12 ? -90 : -10 })) };

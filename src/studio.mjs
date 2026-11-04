@@ -16,7 +16,7 @@ import { applyOperations, coreClips, diffEdits, EditError, LIMITS, layout } from
 import { analyzeMusicFile, timelineBeats } from './beats.mjs';
 import { reviewEdit, describeTimeline, curvesFor, highlights as findHighlights, hookScore } from '../public/insights.js';
 import { templateOptions } from './templates.mjs';
-import { parseSrt } from '../public/captions.js';
+import { parseSrt, parseSrtCues, parseVttCues } from '../public/captions.js';
 import { buildAutoEdit, PLATFORMS } from './autoedit.mjs';
 import { transcribeFile, speechStatus, parseWhisperJson } from './transcribe.mjs';
 import { normalizeWords, wordsFromSegments, findFillers, wordRanges, findPauses, matchPhrase, wordsInEdit, captionsFromEdit, transcriptText } from '../public/transcript.js';
@@ -866,7 +866,7 @@ export async function importTranscript(id, request = {}) {
       else throw new StudioError('INVALID_TRANSCRIPT', 'Unknown JSON transcript: expected whisper.cpp -ojf output, {words:[...]}, or {segments:[...]}');
     } else {
       let cues;
-      try { cues = parseSrt(text.replace(/^WEBVTT[^\n]*\n/, '').replace(/(\d\d:\d\d:\d\d)\.(\d\d\d)/g, '$1,$2').replace(/(^|\n)(\d\d:\d\d)\.(\d\d\d) -->/g, '$100:$2,$3 -->'), index); }
+      try { cues = /\.vtt$/i.test(file.file) ? parseVttCues(text, index) : parseSrtCues(text, index); }
       catch (e) { throw new StudioError('INVALID_TRANSCRIPT', e.message); }
       result = { engine: 'import-srt', words: wordsFromSegments(cues), segments: cues, wordTiming: 'estimated' };
     }

@@ -33,15 +33,48 @@ function stamp(value) {
   if (!m) throw new Error('SRT requires times like 00:00:01,250.');
   return +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 1000;
 }
+function srtBlocks(text) {
+  return text.replace(/\r/g, '').trim().split(/\n\s*\n/).filter(Boolean);
+}
+function cueFromBlock(block, sourceIndex) {
+  const lines = block.split('\n'); if (/^\d+$/.test(lines[0].trim())) lines.shift();
+  const times = lines.shift()?.split('-->');
+  if (times?.length !== 2 || !lines.length) throw new Error('Invalid SRT block.');
+  return { sourceIndex, start: stamp(times[0]), end: stamp(times[1]), text: lines.join(' ').replace(/<[^>]*>/g, '') };
+}
 export function parseSrt(text, sourceIndex = 0) {
   if (text.length > 128 * 1024) throw new Error('SRT is too large (at most 128 KiB).');
-  const blocks = text.replace(/^\uFEFF/, '').replace(/\r/g, '').trim().split(/\n\s*\n/).filter(Boolean);
-  return normalizeCaptions(blocks.map(block => {
-    const lines = block.split('\n'); if (/^\d+$/.test(lines[0].trim())) lines.shift();
-    const times = lines.shift()?.split('-->');
-    if (times?.length !== 2 || !lines.length) throw new Error('Invalid SRT block.');
-    return { sourceIndex, start: stamp(times[0]), end: stamp(times[1]), text: lines.join(' ').replace(/<[^>]*>/g, '') };
-  }));
+  return normalizeCaptions(srtBlocks(text.replace(/^\uFEFF/, '')).map(block => cueFromBlock(block, sourceIndex)));
+}
+/** Transcript cues: the same SRT shape without the caption limits — a talk has thousands of
+ * cues, and importTranscript already caps the file at 32 MiB. */
+export function parseSrtCues(text, sourceIndex = 0) {
+  return srtBlocks(text.replace(/^\uFEFF/, '')).map(block => cueFromBlock(block, sourceIndex));
+}
+function vttStamp(value) {
+  const m = value.trim().match(/^(?:(\d{2,}):)?([0-5]\d):([0-5]\d)\.(\d{3})$/);
+  if (!m) throw new Error('VTT requires times like 00:00:04.000.');
+  return (m[1] ? +m[1] * 3600 : 0) + +m[2] * 60 + +m[3] + +m[4] / 1000;
+}
+/** WebVTT as transcript cues: skips the header block (Kind:/Language: lines after WEBVTT) and
+ * NOTE/STYLE/REGION blocks, accepts cue identifiers, ignores cue settings after the end time,
+ * and reads `mm:ss.ttt` or `hh:mm:ss.ttt` on both sides of --> (YouTube downloads). */
+export function parseVttCues(text, sourceIndex = 0) {
+  const out = [];
+  for (const block of srtBlocks(text)) {
+    const lines = block.split('\n').filter(l => l.trim() !== '');
+    if (!lines.length) continue;
+    const head = lines[0].trim();
+    if (/^WEBVTT($|[\s:])/i.test(head) || /^(NOTE|STYLE|REGION)\b/.test(head)) continue;
+    const at = lines.findIndex(l => l.includes('-->'));
+    if (at < 0) continue;
+    const [from, to] = lines[at].split('-->');
+    if (!to) continue;
+    const cueText = lines.slice(at + 1).join(' ').replace(/<[^>]*>/g, '').trim();
+    if (!cueText) continue;
+    out.push({ sourceIndex, start: vttStamp(from.trim().split(/\s+/)[0]), end: vttStamp(to.trim().split(/\s+/)[0]), text: cueText });
+  }
+  return out;
 }
 export function mapCaptions(rows, clips, offset = 0) {
   const result = []; let cursor = 0;
