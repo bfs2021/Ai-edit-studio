@@ -64,7 +64,7 @@ const NAMED_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39'
 function decodeEntities(text) {
   return text.replace(/&(?:[a-z]+|#[0-9]+|#x[0-9a-fA-F]+);/gi, entity => {
     const name = entity.slice(1, -1).toLowerCase();
-    if (name in NAMED_ENTITIES) return NAMED_ENTITIES[name];
+    if (Object.hasOwn(NAMED_ENTITIES, name)) return NAMED_ENTITIES[name];
     if (name[0] !== '#') return entity;
     const code = name[1] === 'x' ? parseInt(name.slice(2), 16) : +name.slice(1);
     return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : entity;

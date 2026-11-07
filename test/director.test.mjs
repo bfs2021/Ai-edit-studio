@@ -93,6 +93,8 @@ test('VTT import decodes HTML entities in cue text after stripping tags', () => 
   assert.equal(cues[0].text, 'Tom & Jerry <3 "hi" \'ok\' ok é é é');
   const tagged = parseVttCues('WEBVTT\n\n00:01.000 --> 00:02.000\n&lt;b&gt;bold&lt;/b&gt;');
   assert.equal(tagged[0].text, '<b>bold</b>');
+  const proto = parseVttCues('WEBVTT\n\n00:01.000 --> 00:02.000\n&constructor; &amp;lt; &amp;');
+  assert.equal(proto[0].text, '&constructor; &lt; &');
 });
 test('silence proposal is non-mutating, preserves padding and protected final shot', () => {
   const s = { ...source, audio: Array.from({ length: 20 }, (_, i) => ({ time: i / 2, value: i >= 6 && i < 12 ? -90 : -10 })) };
