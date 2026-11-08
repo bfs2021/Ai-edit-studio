@@ -168,6 +168,20 @@ test('publish: chapters, drafts, hashtags and frame quality', () => {
   assert.equal(frameQuality(Buffer.alloc(160 * 90, 5)).mean, 5);
 });
 
+test('publish: a long brief is shortened so the call to action and the hashtags still fit', () => {
+  const d = metadataDrafts({ title: 'T', brief: 'word '.repeat(100), cta: 'Wishlist now', tags: ['gamedev', 'indie'], platforms: ['x', 'steam'] });
+  assert.ok(d.x.description.length <= 280);
+  assert.ok(d.x.description.startsWith('word word'), d.x.description.slice(0, 20));
+  assert.match(d.x.description, /…/);
+  assert.ok(d.x.description.endsWith('Wishlist now\n\n#gamedev #indie'), d.x.description.slice(-40));
+  assert.deepEqual(d.x.hashtags, ['#gamedev', '#indie']);
+  const short = metadataDrafts({ title: 'T', brief: 'Short brief.', cta: 'Wishlist now', tags: ['gamedev'], platforms: ['x'] });
+  assert.equal(short.x.description, 'Short brief.\n\nWishlist now\n\n#gamedev');
+  const words = metadataDrafts({ title: 'T', brief: 'bravo '.repeat(60), platforms: ['steam'] });
+  assert.ok(words.steam.description.length <= 300);
+  assert.ok(words.steam.description.endsWith('bravo…'), words.steam.description.slice(-12));
+});
+
 test('brand colours stay numeric in filters', () => {
   assert.deepEqual(filterColors({ primary: '#ff0000', accent: 'red;drawtext', text: undefined }), { primary: '0xFF0000', accent: '0xF7CF72', text: '0xFFFFFF' });
   assert.match(captionDrawStyle('box', 'low', 1920, false, { primary: '#123456' }), /boxcolor=0x123456@0.72/);

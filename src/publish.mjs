@@ -24,6 +24,13 @@ export const PUBLISH_PLATFORMS = Object.freeze({
 });
 const fmt = s => { const t = Math.max(0, Math.round(s)); const h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), x = t % 60; return `${h ? `${h}:` : ''}${String(m).padStart(h ? 2 : 2, '0')}:${String(x).padStart(2, '0')}`; };
 const clean = (v, n) => String(v ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
+/** Cut text down to `max` characters, ending with `…` and without splitting a word in half. */
+const shorten = (text, max) => {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, Math.max(0, max - 1));
+  const whole = /\S/.test(text.charAt(max - 1)) ? cut.replace(/\s+\S*$/, '') : cut;
+  return `${whole.trimEnd()}…`;
+};
 const filterPath = value => path.resolve(value).replaceAll('\\', '/').replace(':', '\\:').replaceAll("'", "\\'");
 
 /** YouTube-style chapters (first at 0:00, ≥3 chapters, ≥10 s apart) from labelled markers or clip labels. */
@@ -53,9 +60,14 @@ export function metadataDrafts({ title, brief, cta, chapterList = [], tags = [],
   for (const id of platforms) {
     const p = PUBLISH_PLATFORMS[id]; if (!p) continue;
     const list = [...new Set([...p.tags, ...tags])].slice(0, id === 'x' ? 2 : 6).map(t => `#${t}`);
-    const pieces = [about || base, cta ? clean(cta, 100) : '', id === 'youtube' && chapterList.length ? `\n${chapterList.map(c => c.line).join('\n')}` : '', list.join(' ')].filter(Boolean);
+    // The call to action, the chapter list and the hashtags have to survive the cut, so the brief is what gets shortened.
+    const tail = [cta ? clean(cta, 100) : '', id === 'youtube' && chapterList.length ? `\n${chapterList.map(c => c.line).join('\n')}` : '', list.join(' ')].filter(Boolean);
+    const fixed = tail.length ? `\n\n${tail.join('\n\n')}` : '';
+    let head = about || base;
+    if (head.length + fixed.length > p.descriptionMax) head = shorten(head, p.descriptionMax - fixed.length);
+    const pieces = [head, ...tail].filter(Boolean);
     let description = pieces.join('\n\n');
-    if (description.length > p.descriptionMax) description = `${description.slice(0, p.descriptionMax - 1).trimEnd()}…`;
+    if (description.length > p.descriptionMax) description = shorten(description, p.descriptionMax);
     out[id] = { platform: p.name, ...(p.titleMax ? { title: base.slice(0, p.titleMax) } : {}), description, hashtags: list, draft: true };
   }
   return out;
